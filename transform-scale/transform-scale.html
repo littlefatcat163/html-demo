@@ -1,0 +1,182 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no, minimum-scale=1.0, maximum-scale=1.0, user-scalable=0">
+    <title>transform scale</title>
+    <style>
+        html,
+        body {
+            margin: 0;
+            padding: 0;
+            height: 100%;
+            width: 100%;
+            overscroll-behavior: contain;
+            overflow: hidden;
+        }
+        #img {
+            width: 100%;
+            transform-origin: 0 0 0;
+            /* transition: transform 0ms ease-in-out; */
+            /* transform: matrix(2, 0, 0, 2, -100, -100); */
+        }
+        #label {
+            padding: 0;
+            margin: 0;
+            text-align: center;
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            font-size: 14px;
+        }
+    </style>
+</head>
+<body>
+    <p id="label"></p>
+    <img id="img" src="./1.jpg" alt="">
+    <!-- <script src="//cdn.bootcss.com/vConsole/3.3.0/vconsole.min.js"></script>
+    <script>
+        var vConsole = new VConsole();
+   </script> -->
+   <script>
+       // 阻止双指放大
+        document.addEventListener('gesturestart', function(event) {
+            event.preventDefault();
+        });
+   </script>
+    <script>
+        window.onload = function() {
+            var $label = document.getElementById('label');
+            var $img = document.getElementById('img');
+            var left = 0, top = 0, scale = 1;
+            var lastTouch = {
+                x: 0,
+                y: 0
+            };
+            var lastTouches = [];
+            function getPoint(touch) {
+                return {
+                    x: touch.clientX,
+                    y: touch.clientY
+                }
+            }
+            function updateStyle() {
+                $img.style.transitionDuration = '0ms';
+                $img.style.transform = `matrix(${scale}, 0, 0, ${scale}, ${left}, ${top})`;
+            }
+            function getDistance(p1, p2) {
+                return Math.hypot(p2.x - p1.x, p2.y - p1.y);
+            }
+            function getLine(p1, p2) {
+                let a = p1.x - p2.x;
+                let b = p1.y - p2.y;
+                return Math.sqrt(a * a + b * b);
+            }
+            function reset() {
+                if (top >= 0) top = 0;
+                else {
+                    var height = $img.getBoundingClientRect().height;
+                    var min = height - window.innerHeight;
+                    if (min < 0) top = 0;
+                    else if (top <= -min) top = -min;
+                }
+                if (left >= 0) left = 0;
+                else {
+                    var width = $img.getBoundingClientRect().width;
+                    var min = width - screen.availWidth;
+                    if (min < 0) left = 0;
+                    else if (left <= -min) left = -min;
+                }
+                $img.style.transitionDuration = '300ms';
+                $img.style.transform = `matrix(${scale}, 0, 0, ${scale}, ${left}, ${top})`;
+                $label.style.transform = `translate3d(0px, -50px, 0px)`
+            }
+            function move(point) {
+                left += point.x - lastTouch.x;
+                top += point.y - lastTouch.y;
+                updateStyle();
+                lastTouch = point;
+                upadteLabel();
+            }
+            function upadteLabel() {
+                if (top >= 50) {
+                    $label.innerText = '下拉刷新';
+                    $label.style.transform = `translate3d(0px, ${top - 30}px, 0px)`;
+                } else {
+                    var height = $img.getBoundingClientRect().height;
+                    var min = height - window.innerHeight;
+                    if (min < 0 && top <= -50) {
+                        $label.innerText = '上拉刷新';
+                        $label.style.transform = `translate3d(0px, ${height + 20 + top}px, 0px)`;
+                    } else if (top <= -min-50) {
+                        $label.innerText = '上拉刷新';
+                        $label.style.transform = `translate3d(0px, ${height + 20 + top}px, 0px)`;
+                    }
+                }
+            }
+            function zoom(touches) {
+                var point1 = getPoint(touches[0]),
+                    point2 = getPoint(touches[1]);
+                var rect = $img.getBoundingClientRect();
+                var lastScale = scale;
+                scale *= getDistance(point1, point2) / getDistance(lastTouches[0], lastTouches[1]);
+                var distScale = scale - lastScale;
+                var x = (point1.x + point2.x) / 2;
+                var y = (point1.y + point2.y) / 2;
+                left -= distScale * $img.offsetWidth * (x - rect.left) / rect.width;
+                top -= distScale * $img.offsetHeight * (y - rect.top) / rect.height;
+                updateStyle();
+                lastTouches = [point1, point2];
+            }
+            function test(touches) {
+                var point = touches[0];
+                var distScale = 1;
+                var x = point.clientX;
+                var y = point.clientY;
+                var rect = $img.getBoundingClientRect();
+                scale += distScale;
+                left -= distScale * $img.offsetWidth * (x - rect.left) / rect.width;
+                top -= distScale * $img.offsetHeight * (y - rect.top) / rect.height;
+                updateStyle();
+            }
+            $img.addEventListener('touchstart', function(e) {
+                /* test(e.touches);
+                return; */
+                e.preventDefault();
+                if (e.touches.length === 1) {
+                    lastTouch = getPoint(e.touches[0]);
+                    return;
+                }
+                lastTouches = [getPoint(e.touches[0]), getPoint(e.touches[1])];
+            });
+            $img.addEventListener('touchmove', function(e) {
+                e.preventDefault();
+                if (e.touches.length === 1) {
+                    move(getPoint(e.touches[0]));
+                    return;
+                }
+                zoom(e.touches);
+            });
+            $img.addEventListener('touchend', function(e) {
+                if (e.touches.length === 1) {
+                    lastTouch = getPoint(e.touches[0]);
+                } else if (e.touches.length === 0) {
+                    reset();
+                } else if (e.touches.length > 1) {
+                    lastTouches = [getPoint(e.touches[0]), getPoint(e.touches[1])];
+                }
+            });
+            $img.addEventListener('touchcancel', function(e) {
+                if (e.touches.length <= 1) {
+                    lastTouch = getPoint(e.touches[0]);
+                } else if (e.touches.length === 0) {
+                    reset();
+                } else if (e.touches.length > 1) {
+                    lastTouches = [getPoint(e.touches[0]), getPoint(e.touches[1])];
+                }
+            });
+        }
+    </script>
+</body>
+</html>
