@@ -35,10 +35,10 @@
 <body>
     <p id="label"></p>
     <img id="img" src="./1.jpg" alt="">
-    <!-- <script src="//cdn.bootcss.com/vConsole/3.3.0/vconsole.min.js"></script>
+    <script src="//cdn.bootcss.com/vConsole/3.3.0/vconsole.min.js"></script>
     <script>
         var vConsole = new VConsole();
-   </script> -->
+   </script>
    <script>
        // 阻止双指放大
         document.addEventListener('gesturestart', function(event) {
@@ -49,7 +49,8 @@
         window.onload = function() {
             var $label = document.getElementById('label');
             var $img = document.getElementById('img');
-            var left = 0, top = 0, scale = 1;
+            var left = 0, top = 0, scale = 1, split = 0, touchStartPointLength = 0;
+            updateStyle();
             var lastTouch = {
                 x: 0,
                 y: 0
@@ -73,47 +74,70 @@
                 let b = p1.y - p2.y;
                 return Math.sqrt(a * a + b * b);
             }
-            function reset() {
-                if (top >= 0) top = 0;
-                else {
+            function getBoundaryValue(heightValue = window.innerHeight * 0.2, widthValue = window.innerWidth * 0.1) {
+                var _top = top, _left = left;
+                _top = Math.min(heightValue, _top);
+                if (_top < 0) {
                     var height = $img.getBoundingClientRect().height;
                     var min = height - window.innerHeight;
-                    if (min < 0) top = 0;
-                    else if (top <= -min) top = -min;
+                    if (min < 0) _top = Math.max(-heightValue, _top);
+                    else if (_top <= -min) _top = Math.max(-heightValue - min, _top);;
                 }
-                if (left >= 0) left = 0;
-                else {
+                _left = Math.min(widthValue, _left);
+                if (_left < 0) {
                     var width = $img.getBoundingClientRect().width;
                     var min = width - window.innerWidth;
-                    if (min < 0) left = 0;
-                    else if (left <= -min) left = -min;
+                    if (min < 0) _left = Math.max(-widthValue, _left);
+                    else if (_left <= -min) _left = Math.max(-widthValue - min, _left);
                 }
+                return {
+                    top: _top,
+                    left: _left,
+                }
+            }
+            function reset() {
+                var _bound = getBoundaryValue(0, 0);
+                top = _bound.top;
+                left = _bound.left;
                 $img.style.transitionDuration = '300ms';
                 $img.style.transform = `matrix(${scale}, 0, 0, ${scale}, ${left}, ${top})`;
-                $label.style.transform = `translate3d(0px, -50px, 0px)`
+                $label.style.transform = `translate3d(0px, -50px, 0px)`;
+                if (touchStartPointLength === 1) {
+                    setTimeout(function() {
+                        if (split === 0) return;
+                        if (split === 1) alert('下一页');
+                        else if (split === -1) alert ('上一页');
+                    }, 200);
+                }
             }
             function move(point) {
                 left += point.x - lastTouch.x;
                 top += point.y - lastTouch.y;
+                var _bound = getBoundaryValue();
+                left = _bound.left;
+                top = _bound.top;
                 updateStyle();
                 lastTouch = point;
                 upadteLabel();
             }
             function upadteLabel() {
-                if (top >= 50) {
+                if (touchStartPointLength !== 1) {
+                    split = 0;
+                    return;
+                }
+                var _bound = getBoundaryValue(window.innerHeight * 0.1);
+                if (top > 0 && top > _bound.top) {
                     $label.innerText = '下拉刷新';
                     $label.style.transform = `translate3d(0px, ${top - 30}px, 0px)`;
-                } else {
-                    var height = $img.getBoundingClientRect().height;
-                    var min = height - window.innerHeight;
-                    if (min < 0 && top <= -50) {
-                        $label.innerText = '上拉刷新';
-                        $label.style.transform = `translate3d(0px, ${height + 20 + top}px, 0px)`;
-                    } else if (top <= -min-50) {
-                        $label.innerText = '上拉刷新';
-                        $label.style.transform = `translate3d(0px, ${height + 20 + top}px, 0px)`;
-                    }
+                    split = -1;
+                    return;
+                } else if (top <0 && top < _bound.top) {
+                    $label.innerText = '上拉刷新';
+                    $label.style.transform = `translate3d(0px, ${top + $img.getBoundingClientRect().height + 10}px, 0px)`;
+                    split = 1;
+                    return;
                 }
+                split = 0;
             }
             function zoom(touches) {
                 var point1 = getPoint(touches[0]),
@@ -121,6 +145,7 @@
                 var rect = $img.getBoundingClientRect();
                 var lastScale = scale;
                 scale *= getDistance(point1, point2) / getDistance(lastTouches[0], lastTouches[1]);
+                scale = Math.min(5, Math.max(1, scale));
                 var distScale = scale - lastScale;
                 var x = (point1.x + point2.x) / 2;
                 var y = (point1.y + point2.y) / 2;
@@ -144,6 +169,7 @@
                 /* test(e.touches);
                 return; */
                 e.preventDefault();
+                touchStartPointLength = e.touches.length;
                 if (e.touches.length === 1) {
                     lastTouch = getPoint(e.touches[0]);
                     return;
